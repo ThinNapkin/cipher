@@ -600,6 +600,7 @@ function startDuelGame(d){
   startDuelPoll();
 }
 
+let lastKnownTurn=0;
 function updateTurnBanner(turn){
   const banner=document.getElementById('turn-banner');
   const isMyTurn=(duelPlayerNum===turn);
@@ -607,7 +608,11 @@ function updateTurnBanner(turn){
   banner.textContent=isMyTurn?'YOUR TURN — ATTACK!':'OPPONENT\'S TURN — DEFEND...';
   const btn=document.getElementById('duel-guess-btn');
   btn.disabled=!isMyTurn;
-  clearInputs('duel-guess-inputs');
+  // Only clear inputs when the turn changes TO the player, not on every poll tick
+  if(isMyTurn && turn!==lastKnownTurn){
+    clearInputs('duel-guess-inputs');
+  }
+  lastKnownTurn=turn;
 }
 
 // ── DUEL POLL ─────────────────────────────────────────────
