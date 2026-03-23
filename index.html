@@ -443,9 +443,39 @@ function copyCode(){navigator.clipboard?.writeText(roomCode).catch(()=>{});const
 // ── Aligned history renderer ───────────────────────────────
 function renderAlignedHistory(lG,lR,rG,rR,wrapId){
   const wrap=document.getElementById(wrapId);
-  wrap.innerHTML='';
-  const rows=Math.max(lG.length,rG.length);
-  for(let i=0;i<rows;i++){
+  const maxRows=Math.max(lG.length,rG.length);
+  const existing=wrap.querySelectorAll('.ah-row').length;
+
+  // Update existing rows in case a pending badge now has a result
+  const rows=[...wrap.querySelectorAll('.ah-row')];
+  rows.forEach((row,i)=>{
+    const cells=row.querySelectorAll('.ah-cell');
+    // left badge (index 0), right badge (index 1)
+    const lb=cells[0]?.querySelector('.ah-badge');
+    const rb=cells[1]?.querySelector('.ah-badge');
+    if(lb&&lb.textContent==='...'&&lR[i]!==undefined){
+      lb.textContent=lR[i]===4?'4/4':lR[i]+'/4';
+      if(lR[i]===4)lb.classList.add('win');
+    }
+    if(rb&&rb.textContent==='...'&&rR[i]!==undefined){
+      rb.textContent=rR[i]===4?'4/4':rR[i]+'/4';
+      if(rR[i]===4)rb.classList.add('win');
+    }
+    // Fill empty placeholder cells if the other side now has a guess
+    const leftEmpty=cells[0]?.querySelectorAll('.ah-dbox.empty');
+    const rightEmpty=cells[1]?.querySelectorAll('.ah-dbox.empty');
+    if(leftEmpty?.length&&lG[i]!==undefined){
+      const newCell=makeAhCell(lG[i],lR[i],false);
+      cells[0].replaceWith(newCell);
+    }
+    if(rightEmpty?.length&&rG[i]!==undefined){
+      const newCell=makeAhCell(rG[i],rR[i],true);
+      cells[1].replaceWith(newCell);
+    }
+  });
+
+  // Append only new rows beyond what's already rendered
+  for(let i=existing;i<maxRows;i++){
     const row=document.createElement('div');row.className='ah-row';
     const num=document.createElement('div');num.className='ah-num';num.textContent=String(i+1).padStart(2,'0');
     row.append(makeAhCell(lG[i],lR[i],false),num,makeAhCell(rG[i],rR[i],true));
