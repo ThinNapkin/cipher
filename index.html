@@ -404,47 +404,20 @@ const CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode=()=>Array.from({length:6},()=>CHARS[Math.floor(Math.random()*CHARS.length)]).join('');
 const roomUrl=code=>`${FIREBASE_URL}/rooms/${code}.json`;
 
-// ── Crypto (pure-JS XOR, works in any environment) ────────
-// Derives a 32-byte key from the room code using FNV-1a hash
-function deriveXorKey(roomCode){
-  const key=new Uint8Array(32);
-  for(let i=0;i<32;i++){
-    let h=0x811c9dc5;
-    for(let j=0;j<roomCode.length;j++){
-      h^=roomCode.charCodeAt((j+i)%roomCode.length);
-      h=(h*0x01000193)>>>0;
-    }
-    key[i]=h&0xff;
-  }
-  return key;
-}
-function xorEncrypt(arr,key){
-  const bytes=new TextEncoder().encode(JSON.stringify(arr));
-  const out=new Uint8Array(bytes.length);
-  for(let i=0;i<bytes.length;i++) out[i]=bytes[i]^key[i%key.length];
-  return btoa(String.fromCharCode(...out));
-}
-function xorDecrypt(b64,key){
-  const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-  const out=new Uint8Array(bytes.length);
-  for(let i=0;i<bytes.length;i++) out[i]=bytes[i]^key[i%key.length];
-  return JSON.parse(new TextDecoder().decode(out));
-}
-// Async wrappers so the rest of the code stays unchanged
-async function deriveCryptoKey(roomCode){ return deriveXorKey(roomCode); }
-async function encryptSecret(arr,key){ return xorEncrypt(arr,key); }
-async function decryptSecret(b64,key){ return xorDecrypt(b64,key); }
+// ── Obfuscation (btoa/atob + salt, not cryptographic) ─────
+const SALT='cr4ck1t';
+async function deriveCryptoKey(roomCode){ return roomCode; }
+async function encryptSecret(arr){ return btoa(SALT+JSON.stringify(arr)); }
+async function decryptSecret(b64){ return JSON.parse(atob(b64).slice(SALT.length)); }
 
 // ── Self-test on load ──────────────────────────────────────
 (async()=>{
   try{
-    const k=await deriveCryptoKey('TEST12');
-    const enc=await encryptSecret([1,2,3,4],k);
-    const dec=await decryptSecret(enc,k);
-    const ok=dec.join('')==='1234';
-    console.log(ok?'[CrackIt] Crypto self-test PASSED ✓':'[CrackIt] Crypto self-test FAILED ✗',dec);
+    const enc=await encryptSecret([1,2,3,4]);
+    const dec=await decryptSecret(enc);
+    console.log(dec.join('')==='1234'?'[CrackIt] Obfuscation self-test PASSED ✓':'[CrackIt] Obfuscation self-test FAILED ✗');
   }catch(e){
-    console.error('[CrackIt] Crypto self-test ERROR:',e.message);
+    console.error('[CrackIt] Obfuscation self-test ERROR:',e.message);
   }
 })();
 
@@ -539,7 +512,7 @@ async function createRoom(){
     let data;
     if(pendingMode==='duel'){
       cryptoKey=await deriveCryptoKey(code);
-      const enc1=await encryptSecret(v,cryptoKey);
+      const enc1=await encryptSecret(v);
       data={mode:'duel',p1_secret:enc1,p2_secret:null,p1_guesses:[],p1_results:[],p2_guesses:[],p2_results:[],status:'waiting',turn:1,winner:0,created:Date.now()};
     } else {
       data={mode:'online',secret:v,status:'waiting',guesses:[],results:[],created:Date.now()};
@@ -647,7 +620,7 @@ async function confirmDuelP2Pin(){
   const btn=document.querySelector('#s-duel-p2-pin .bp');
   btn.disabled=true;btn.textContent='LOCKING IN...';
   try{
-    const enc2=await encryptSecret(v,cryptoKey);
+    const enc2=await encryptSecret(v);
     await dbPatch(roomCode,{p2_secret:enc2,status:'active'});
     const d=await dbGet(roomCode);
     duelPlayerNum=2;duelMyAttempts=0;
