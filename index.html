@@ -337,17 +337,17 @@ function genCode(){ return Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23
 async function roomKey(code){ return 'crackit-room-'+code; }
 
 async function saveRoom(code, data){
-  try{ await window.storage.set(await roomKey(code), JSON.stringify(data), true); }
-  catch(e){ console.error('save err',e); }
+  const res = await window.storage.set('crackit-room-'+code, JSON.stringify(data), true);
+  if(!res) throw new Error('Storage save failed');
 }
 async function loadRoom(code){
   try{
-    const r = await window.storage.get(await roomKey(code), true);
+    const r = await window.storage.get('crackit-room-'+code, true);
     return r ? JSON.parse(r.value) : null;
   } catch(e){ return null; }
 }
 async function deleteRoom(code){
-  try{ await window.storage.delete(await roomKey(code), true); } catch(e){}
+  try{ await window.storage.delete('crackit-room-'+code, true); } catch(e){}
 }
 
 // ─── SOLO ─────────────────────────────────────────────────
@@ -382,14 +382,23 @@ function goJoin(){ document.getElementById('join-code-input').value=''; document
 async function createRoom(){
   const v=['cp0','cp1','cp2','cp3'].map(id=>document.getElementById(id).value.trim());
   if(v.some(x=>x===''||isNaN(x))){ document.getElementById('create-pin-err').textContent='// INPUT INCOMPLETE'; return; }
-  const pin=v.map(Number);
-  roomCode=genCode();
-  const data={ secret:pin, status:'waiting', guesses:[], created:Date.now() };
-  await saveRoom(roomCode, data);
-  secret=pin; isHost=true; gameMode='online';
-  document.getElementById('room-code-display').textContent=roomCode;
-  show('s-host-wait');
-  startHostPoll();
+  const btn=document.querySelector('#s-create-pin .bp');
+  btn.disabled=true; btn.textContent='CREATING...';
+  document.getElementById('create-pin-err').textContent='';
+  try{
+    const pin=v.map(Number);
+    roomCode=genCode();
+    const data={ secret:pin, status:'waiting', guesses:[], created:Date.now() };
+    await saveRoom(roomCode, data);
+    secret=pin; isHost=true; gameMode='online';
+    document.getElementById('room-code-display').textContent=roomCode;
+    show('s-host-wait');
+    startHostPoll();
+  } catch(e){
+    document.getElementById('create-pin-err').textContent='// STORAGE ERROR — TRY AGAIN';
+  } finally{
+    btn.disabled=false; btn.textContent='CREATE ROOM';
+  }
 }
 
 function startHostPoll(){
@@ -433,20 +442,27 @@ async function cancelHost(){
 async function joinRoom(){
   const code=document.getElementById('join-code-input').value.trim().toUpperCase();
   if(code.length!==6){ document.getElementById('join-err').textContent='// ENTER 6-CHARACTER CODE'; return; }
-  const d=await loadRoom(code);
-  if(!d){ document.getElementById('join-err').textContent='// ROOM NOT FOUND'; return; }
-  if(d.status==='won'){ document.getElementById('join-err').textContent='// GAME ALREADY ENDED'; return; }
-  roomCode=code; secret=d.secret; isHost=false; gameMode='online'; attempts=d.guesses.length;
-  // Mark active
-  d.status='active'; await saveRoom(code, d);
-  resetGameUI('ONLINE');
-  // Replay existing guesses
-  if(d.guesses.length>0){
-    const h=document.getElementById('history');
-    d.guesses.forEach((g,i)=>h.appendChild(makeRow(g.digits,g.correct,i+1)));
-    document.getElementById('attempt-count').textContent=String(d.guesses.length).padStart(2,'0');
+  const btn=document.querySelector('#s-join .bp');
+  btn.disabled=true; btn.textContent='CONNECTING...';
+  document.getElementById('join-err').textContent='';
+  try{
+    const d=await loadRoom(code);
+    if(!d){ document.getElementById('join-err').textContent='// ROOM NOT FOUND — CHECK CODE & RETRY'; btn.disabled=false; btn.textContent='JOIN'; return; }
+    if(d.status==='won'){ document.getElementById('join-err').textContent='// GAME ALREADY ENDED'; btn.disabled=false; btn.textContent='JOIN'; return; }
+    roomCode=code; secret=d.secret; isHost=false; gameMode='online'; attempts=d.guesses.length;
+    d.status='active'; await saveRoom(code, d);
+    resetGameUI('ONLINE');
+    if(d.guesses.length>0){
+      const h=document.getElementById('history');
+      d.guesses.forEach((g,i)=>h.appendChild(makeRow(g.digits,g.correct,i+1)));
+      document.getElementById('attempt-count').textContent=String(d.guesses.length).padStart(2,'0');
+    }
+    show('s-game');
+  } catch(e){
+    document.getElementById('join-err').textContent='// CONNECTION ERROR — TRY AGAIN';
+  } finally{
+    btn.disabled=false; btn.textContent='JOIN';
   }
-  show('s-game');
 }
 
 // ─── GAME ──────────────────────────────────────────────────
