@@ -115,9 +115,22 @@ hr.sep{border:none;border-top:1px solid var(--br);margin:2px 0;}
 .pass-msg span{color:var(--g);font-family:'Orbitron',monospace;}
 .access{font-size:0.62rem;letter-spacing:8px;color:var(--g);border:1px solid var(--bb);padding:5px 16px;text-shadow:var(--gs);animation:pulse 1.2s infinite alternate;}
 .wtitle{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:700;letter-spacing:4px;color:var(--g);text-shadow:0 0 30px rgba(0,255,170,0.8);animation:pulse 1.2s infinite alternate;}
+.wtitle.lose{color:var(--r);text-shadow:0 0 30px rgba(255,58,92,0.8);}
+.wtitle.win{color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,0.8);}
+.access.lose{color:var(--r);border-color:rgba(255,58,92,0.5);text-shadow:0 0 8px var(--r);}
+.access.win{color:var(--gold);border-color:rgba(255,215,0,0.5);text-shadow:0 0 8px var(--gold);}
+.my-code-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:rgba(0,255,170,0.03);border:1px solid var(--br);flex-wrap:wrap;}
+.my-code-label{font-size:0.55rem;letter-spacing:4px;color:var(--mt);flex-shrink:0;}
+.my-code-digits{display:flex;gap:6px;}
+.my-code-digit{width:34px;height:34px;border:1px solid rgba(0,255,170,0.25);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:1rem;font-weight:700;color:var(--g);background:rgba(0,255,170,0.05);position:relative;cursor:pointer;user-select:none;}
+.my-code-digit .revealed{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;}
+.my-code-digit .masked{font-size:1.2rem;color:var(--mt);transition:opacity .15s;}
+.my-code-bar:active .revealed, .my-code-bar.showing .revealed{opacity:1;}
+.my-code-bar:active .masked, .my-code-bar.showing .masked{opacity:0;}
+.my-code-hint{font-size:0.5rem;letter-spacing:2px;color:var(--mt);opacity:0.6;margin-left:auto;}
 .wsub{font-size:0.7rem;color:rgba(240,255,248,0.48);line-height:2.4;}
 .wsub span{color:var(--g);font-family:'Orbitron',monospace;}
-@keyframes pulse{from{opacity:1;}to{opacity:0.4;}}
+.duel-code-digit{width:52px;height:52px;border:1px solid;display:flex;align-items:center;justify-content:center;font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:700;}
 </style>
 </head>
 <body>
@@ -189,6 +202,11 @@ hr.sep{border:none;border-top:1px solid var(--br);margin:2px 0;}
       <div class="mcard duel-card" onclick="goJoin('duel')">
         <div class="ml">// AGENT 2</div><div class="mt2">JOIN</div>
         <div class="ms">Enter the room key, set your code, and defend.</div>
+      </div>
+      <div class="mcard" onclick="goSpectate()" style="border-color:rgba(180,130,255,0.3);">
+        <div class="ml" style="color:rgba(180,130,255,0.6);">// OBSERVER</div>
+        <div class="mt2" style="color:#b482ff;">SPECTATE</div>
+        <div class="ms">Watch a live duel without playing.</div>
       </div>
     </div>
     <div class="btn-row"><button class="bs btn" onclick="show('s-menu')">← BACK</button></div>
@@ -286,6 +304,11 @@ hr.sep{border:none;border-top:1px solid var(--br);margin:2px 0;}
       <div class="att">YOUR ATTACKS: <span id="duel-attempt-count">00</span></div>
     </div>
     <div class="turn-banner their-turn" id="turn-banner">OPPONENT'S TURN</div>
+    <div class="my-code-bar" id="my-code-bar">
+      <span class="my-code-label">YOUR CODE:</span>
+      <div class="my-code-digits" id="my-code-digits"></div>
+      <span class="my-code-hint">hold to reveal</span>
+    </div>
     <div class="duel-cols">
       <div>
         <div class="duel-col-label"><div class="dot" style="background:var(--g);animation:none;"></div>YOUR ATTACKS</div>
@@ -366,13 +389,68 @@ hr.sep{border:none;border-top:1px solid var(--br);margin:2px 0;}
     <div class="btn-row" style="justify-content:center;"><button class="bp btn" onclick="startLocalGuess()">I'M READY</button></div>
   </div>
 
-  <!-- WIN -->
+  <!-- SPECTATE JOIN -->
+  <div class="screen" id="s-spectate-join">
+    <div class="sec-label" style="color:rgba(180,130,255,0.6);">OBSERVER PROTOCOL</div>
+    <div style="font-size:0.65rem;color:rgba(240,255,248,0.45);line-height:1.9;">Enter the 6-digit duel room code to observe the battle.</div>
+    <div>
+      <div class="field-label">ROOM CODE</div>
+      <input class="text-input" id="spectate-input" maxlength="6" placeholder="XXXXXX" autocomplete="off"
+        oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+    </div>
+    <div class="err" id="spectate-err"></div>
+    <div class="btn-row">
+      <button class="bp btn" id="spectate-btn" onclick="joinSpectate()" style="color:#b482ff;border-color:rgba(180,130,255,0.5);">OBSERVE</button>
+      <button class="bs btn" onclick="show('s-duel-menu')">← BACK</button>
+    </div>
+  </div>
+
+  <!-- SPECTATE GAME -->
+  <div class="screen" id="s-spectate-game">
+    <div class="top-bar">
+      <div class="mode-tag">PROTOCOL: <span style="color:#b482ff;">SPECTATOR</span></div>
+      <div class="status-row"><div class="dot" style="background:#b482ff;box-shadow:0 0 8px rgba(180,130,255,0.5);"></div><span id="spectate-status-txt" style="color:rgba(180,130,255,0.6);">OBSERVING LIVE</span></div>
+    </div>
+    <div class="turn-banner their-turn" id="spectate-turn-banner">WAITING FOR DUEL TO START...</div>
+    <div class="duel-cols">
+      <div>
+        <div class="duel-col-label"><div class="dot" style="background:var(--g);animation:none;box-shadow:none;"></div>AGENT 1 ATTACKS</div>
+        <div class="duel-history" id="spectate-p1-history"></div>
+      </div>
+      <div>
+        <div class="duel-col-label"><div class="dot red" style="animation:none;"></div>AGENT 2 ATTACKS</div>
+        <div class="duel-history" id="spectate-p2-history"></div>
+      </div>
+    </div>
+    <div id="spectate-waiting" style="font-size:0.6rem;color:rgba(180,130,255,0.5);letter-spacing:3px;padding:6px 0;text-align:center;">AWAITING FIRST ATTACK...</div>
+    <div class="btn-row"><button class="bs btn" onclick="stopPoll();show('s-duel-menu');">← LEAVE</button></div>
+  </div>
+
+  <!-- SPECTATE WIN -->
+  <div class="screen" id="s-spectate-win">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
+      <div class="access" style="color:#b482ff;border-color:rgba(180,130,255,0.5);text-shadow:0 0 8px #b482ff;">// DUEL CONCLUDED //</div>
+      <div class="wtitle" style="color:#b482ff;text-shadow:0 0 30px rgba(180,130,255,0.8);">MATCH OVER</div>
+      <div class="wsub" id="spectate-result-sub"></div>
+      <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;" id="spectate-codes-row"></div>
+      <button class="bs btn" onclick="stopPoll();show('s-duel-menu');">← BACK</button>
+    </div>
+  </div>
+
+
   <div class="screen" id="s-win">
     <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
       <div class="access" id="win-access">// ACCESS GRANTED //</div>
       <div class="wtitle" id="win-title">CODE CRACKED</div>
       <div class="wsub" id="win-sub">Passcode was &nbsp;<span id="win-code"></span><br>Decrypted in &nbsp;<span id="win-att"></span>&nbsp; attempt(s).</div>
-      <button class="bp btn" onclick="cancelOnline();show('s-menu');">MENU</button>
+      <div id="win-opp-code-box" style="display:none;margin-top:4px;">
+        <div style="font-size:0.56rem;letter-spacing:5px;color:var(--mt);margin-bottom:8px;" id="win-opp-label">OPPONENT'S CODE WAS</div>
+        <div style="display:flex;gap:10px;justify-content:center;" id="win-opp-digits"></div>
+      </div>
+      <div class="btn-row" style="justify-content:center;margin-top:4px;">
+        <button class="bp btn" id="win-rematch-btn" style="display:none;" onclick="duelRematch()">⟳ REMATCH</button>
+        <button class="bs btn" onclick="cancelOnline();show('s-menu');">MENU</button>
+      </div>
     </div>
   </div>
 </div>
@@ -394,7 +472,7 @@ async function dbDelete(code){ await fetch(roomUrl(code),{method:'DELETE'}).catc
 let secret=[], attempts=0, gameMode='solo', roomCode='', pollTimer=null;
 let isHost=false, knownGuessCount=0;
 // Duel state
-let duelPlayerNum=1, duelMyAttempts=0, duelKnownMine=0, duelKnownTheirs=0;
+let duelPlayerNum=1, duelMyAttempts=0, duelKnownMine=0, duelKnownTheirs=0, duelOppSecret=[];
 let pendingMode='online'; // which mode join is for
 
 // ── Screen ─────────────────────────────────────────────────
@@ -453,7 +531,7 @@ async function createRoom(){
     while(exists&&tries<10){ code=genCode(); const ex=await dbGet(code); exists=ex!==null; tries++; }
     let data;
     if(pendingMode==='duel'){
-      data={mode:'duel',p1_secret:v,p2_secret:null,p1_guesses:[],p1_results:[],p2_guesses:[],p2_results:[],status:'waiting',turn:1,winner:0,created:Date.now()};
+      data={mode:'duel',p1_secret:v,p2_secret:null,p1_guesses:[],p1_results:[],p2_guesses:[],p2_results:[],status:'waiting',turn:1,winner:0,rematch:0,created:Date.now()};
     } else {
       data={mode:'online',secret:v,status:'waiting',guesses:[],results:[],created:Date.now()};
     }
@@ -506,7 +584,7 @@ function startDuelHostPoll(){
       stopPoll();
       document.getElementById('host-wait-txt').textContent='AGENT 2 JOINED — DUEL STARTING...';
       duelPlayerNum=1; duelMyAttempts=0; duelKnownMine=0; duelKnownTheirs=0;
-      // p1 attacks opponent (p2_secret), p1 defends with p1_secret
+      duelOppSecret=d.p2_secret;
       startDuelGame(d);
     }
   },2000);
@@ -567,6 +645,7 @@ async function confirmDuelP2Pin(){
     await dbPatch(roomCode,{p2_secret:v,status:'active'});
     const d=await dbGet(roomCode);
     duelPlayerNum=2; duelMyAttempts=0; duelKnownMine=0; duelKnownTheirs=0;
+    duelOppSecret=d.p1_secret;
     startDuelGame(d);
   } catch(e){
     document.getElementById('duel-p2-err').textContent='// ERROR — TRY AGAIN';
@@ -582,6 +661,24 @@ function startDuelGame(d){
   document.getElementById('duel-attempt-count').textContent='00';
   document.getElementById('duel-guess-err').textContent='';
   clearInputs('duel-guess-inputs');
+
+  // Show player's own code (masked, reveal on hold)
+  const bar=document.getElementById('my-code-bar');
+  const digitsEl=document.getElementById('my-code-digits');
+  digitsEl.innerHTML='';
+  const mySecret=duelPlayerNum===1?d.p1_secret:d.p2_secret;
+  mySecret.forEach(n=>{
+    const box=document.createElement('div'); box.className='my-code-digit';
+    const m=document.createElement('span'); m.className='masked'; m.textContent='●';
+    const r=document.createElement('span'); r.className='revealed'; r.textContent=n;
+    box.append(m,r); digitsEl.appendChild(box);
+  });
+  // Hold to reveal
+  bar.addEventListener('mousedown',()=>bar.classList.add('showing'));
+  bar.addEventListener('touchstart',()=>bar.classList.add('showing'),{passive:true});
+  bar.addEventListener('mouseup',()=>bar.classList.remove('showing'));
+  bar.addEventListener('mouseleave',()=>bar.classList.remove('showing'));
+  bar.addEventListener('touchend',()=>bar.classList.remove('showing'));
   updateTurnBanner(d.turn);
   // Replay existing guesses if any
   (d.p1_guesses||[]).forEach((g,i)=>{
@@ -718,18 +815,160 @@ async function submitDuelGuess(){
 }
 
 function showDuelWin(iWon, att){
-  document.getElementById('win-access').textContent = iWon?'// MISSION COMPLETE //':'// MISSION FAILED //';
-  document.getElementById('win-title').textContent   = iWon?'YOU WIN!':'YOU LOSE';
-  document.getElementById('win-title').style.color   = iWon?'var(--gold)':'var(--r)';
-  document.getElementById('win-sub').innerHTML       = iWon
-    ? `You cracked their code in <span>${att}</span> attempt(s)!`
-    : `Opponent cracked your code first. Better luck next time.`;
-  document.getElementById('win-code').textContent='';
-  document.getElementById('win-att').textContent='';
+  const accessEl=document.getElementById('win-access');
+  const titleEl=document.getElementById('win-title');
+  const subEl=document.getElementById('win-sub');
+  const oppBox=document.getElementById('win-opp-code-box');
+  const oppDigits=document.getElementById('win-opp-digits');
+  const rematchBtn=document.getElementById('win-rematch-btn');
+
+  accessEl.className='access '+(iWon?'win':'lose');
+  accessEl.textContent=iWon?'// MISSION COMPLETE //':'// MISSION FAILED //';
+
+  titleEl.className='wtitle '+(iWon?'win':'lose');
+  titleEl.textContent=iWon?'YOU WIN':'YOU LOSE';
+
+  subEl.innerHTML=iWon
+    ?`You cracked their code in <span style="color:var(--gold)">${att}</span> attempt(s).`
+    :`The opponent cracked your code first.`;
+
+  // Show opponent's code digits
+  oppDigits.innerHTML='';
+  document.getElementById('win-opp-label').textContent=iWon?'THEIR CODE WAS':'YOUR CODE WAS SAFE — OPPONENT\'S WAS';
+  const codeToShow = iWon ? duelOppSecret : duelOppSecret;
+  codeToShow.forEach(d=>{
+    const box=document.createElement('div');
+    box.className='duel-code-digit';
+    box.style.borderColor=iWon?'rgba(255,215,0,0.5)':'rgba(255,58,92,0.5)';
+    box.style.color=iWon?'var(--gold)':'var(--r)';
+    box.style.background=iWon?'rgba(255,215,0,0.06)':'rgba(255,58,92,0.06)';
+    box.style.boxShadow=iWon?'0 0 10px rgba(255,215,0,0.2)':'0 0 10px rgba(255,58,92,0.2)';
+    box.textContent=d;
+    oppDigits.appendChild(box);
+  });
+  oppBox.style.display='block';
+  rematchBtn.style.display='inline-block';
+  rematchBtn.style.color=iWon?'var(--gold)':'var(--r)';
+  rematchBtn.style.borderColor=iWon?'rgba(255,215,0,0.5)':'rgba(255,58,92,0.5)';
   show('s-win');
 }
 
-// ── ONLINE GUEST POLL ─────────────────────────────────────
+async function duelRematch(){
+  // Host creates a new room, guest re-joins flow
+  stopPoll();
+  if(isHost){
+    cancelOnline();
+    goDuelHost();
+  } else {
+    cancelOnline();
+    goJoin('duel');
+  }
+}
+
+// ── SPECTATE ──────────────────────────────────────────────
+let spectateKnownP1=0, spectateKnownP2=0;
+
+function goSpectate(){
+  document.getElementById('spectate-input').value='';
+  document.getElementById('spectate-err').textContent='';
+  show('s-spectate-join');
+}
+
+async function joinSpectate(){
+  const code=document.getElementById('spectate-input').value.trim().toUpperCase();
+  if(code.length!==6){document.getElementById('spectate-err').textContent='// ENTER 6-CHARACTER CODE';return;}
+  const btn=document.getElementById('spectate-btn');
+  btn.disabled=true; btn.textContent='CONNECTING...';
+  document.getElementById('spectate-err').textContent='';
+  try{
+    const d=await dbGet(code);
+    if(!d){document.getElementById('spectate-err').textContent='// ROOM NOT FOUND — CHECK CODE';return;}
+    if(d.mode!=='duel'){document.getElementById('spectate-err').textContent='// NOT A DUEL ROOM';return;}
+    roomCode=code; spectateKnownP1=0; spectateKnownP2=0;
+    document.getElementById('spectate-p1-history').innerHTML='';
+    document.getElementById('spectate-p2-history').innerHTML='';
+    document.getElementById('spectate-waiting').style.display='block';
+    // Replay existing
+    renderSpectateHistory(d);
+    updateSpectateBanner(d);
+    show('s-spectate-game');
+    if(d.status!=='won') startSpectatePoll();
+    else showSpectateWin(d);
+  } catch(e){
+    document.getElementById('spectate-err').textContent='// CONNECTION ERROR — TRY AGAIN';
+  } finally{
+    btn.disabled=false; btn.textContent='OBSERVE';
+  }
+}
+
+function renderSpectateHistory(d){
+  const p1El=document.getElementById('spectate-p1-history');
+  const p2El=document.getElementById('spectate-p2-history');
+  const p1g=d.p1_guesses||[], p1r=d.p1_results||[];
+  const p2g=d.p2_guesses||[], p2r=d.p2_results||[];
+  for(let i=spectateKnownP1;i<p1g.length;i++){
+    p1El.appendChild(makeDuelRow(p1g[i],p1r[i]??0,i+1));
+    p1El.scrollTop=9999;
+    if((p1g.length+p2g.length)>0) document.getElementById('spectate-waiting').style.display='none';
+  }
+  for(let i=spectateKnownP2;i<p2g.length;i++){
+    p2El.appendChild(makeDuelRow(p2g[i],p2r[i]??0,i+1));
+    p2El.scrollTop=9999;
+    if((p1g.length+p2g.length)>0) document.getElementById('spectate-waiting').style.display='none';
+  }
+  spectateKnownP1=p1g.length;
+  spectateKnownP2=p2g.length;
+}
+
+function updateSpectateBanner(d){
+  const banner=document.getElementById('spectate-turn-banner');
+  if(d.status==='waiting'){ banner.textContent='WAITING FOR BOTH AGENTS...'; banner.className='turn-banner their-turn'; return; }
+  if(d.status==='won'){ banner.textContent='DUEL OVER'; banner.className='turn-banner their-turn'; return; }
+  const t=d.turn||1;
+  banner.className='turn-banner your-turn';
+  banner.style.color='#b482ff'; banner.style.borderColor='rgba(180,130,255,0.4)'; banner.style.background='rgba(180,130,255,0.06)';
+  banner.textContent=`AGENT ${t} IS ATTACKING`;
+}
+
+function startSpectatePoll(){
+  stopPoll();
+  pollTimer=setInterval(async()=>{
+    const d=await dbGet(roomCode); if(!d) return;
+    renderSpectateHistory(d);
+    updateSpectateBanner(d);
+    document.getElementById('spectate-status-txt').textContent=
+      `OBSERVING LIVE — ${((d.p1_guesses||[]).length+(d.p2_guesses||[]).length)} ATTACKS`;
+    if(d.status==='won'){ stopPoll(); showSpectateWin(d); }
+  },2000);
+}
+
+function showSpectateWin(d){
+  const winner=d.winner||1;
+  document.getElementById('spectate-result-sub').innerHTML=
+    `<span style="color:#b482ff;font-family:'Orbitron',monospace">AGENT ${winner}</span> cracked the code first and won the duel.`;
+  // Show both codes
+  const row=document.getElementById('spectate-codes-row');
+  row.innerHTML='';
+  [{label:'AGENT 1 CODE',code:d.p1_secret,col:'var(--g)'},{label:'AGENT 2 CODE',code:d.p2_secret,col:'var(--r)'}].forEach(({label,code,col})=>{
+    const col2=document.createElement('div');
+    col2.style.cssText='display:flex;flex-direction:column;align-items:center;gap:8px;';
+    const lbl=document.createElement('div');
+    lbl.style.cssText=`font-size:0.55rem;letter-spacing:4px;color:${col};`;
+    lbl.textContent=label;
+    const digs=document.createElement('div');
+    digs.style.cssText='display:flex;gap:6px;';
+    (code||[]).forEach(n=>{
+      const b=document.createElement('div');
+      b.className='duel-code-digit';
+      b.style.cssText=`border-color:${col}44;color:${col};background:${col}0d;box-shadow:0 0 8px ${col}33;`;
+      b.textContent=n; digs.appendChild(b);
+    });
+    col2.append(lbl,digs); row.appendChild(col2);
+  });
+  show('s-spectate-win');
+}
+
+
 function startGuestPoll(){
   stopPoll();
   pollTimer=setInterval(async()=>{
@@ -822,6 +1061,7 @@ wireInputs('local-pin-inputs',confirmLocalPin,'lpd');
 wireInputs('duel-p2-pin-inputs',confirmDuelP2Pin,'dp2d');
 wireInputs('duel-guess-inputs',submitDuelGuess,null);
 document.getElementById('join-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinRoom();});
+document.getElementById('spectate-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinSpectate();});
 
 // ── Matrix rain ────────────────────────────────────────────
 const cv=document.getElementById('bg'),cx=cv.getContext('2d');
