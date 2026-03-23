@@ -882,20 +882,19 @@ async function joinSpectate(){
   document.getElementById('spectate-err').textContent='';
   try{
     const d=await dbGet(code);
-    if(!d){document.getElementById('spectate-err').textContent='// ROOM NOT FOUND — CHECK CODE';return;}
-    if(d.mode!=='duel'){document.getElementById('spectate-err').textContent='// NOT A DUEL ROOM';return;}
+    if(d===null||d===undefined){document.getElementById('spectate-err').textContent='// ROOM NOT FOUND — CHECK CODE';btn.disabled=false;btn.textContent='OBSERVE';return;}
+    if(d.mode&&d.mode!=='duel'){document.getElementById('spectate-err').textContent='// NOT A DUEL ROOM';btn.disabled=false;btn.textContent='OBSERVE';return;}
     roomCode=code; spectateKnownP1=0; spectateKnownP2=0;
     document.getElementById('spectate-p1-history').innerHTML='';
     document.getElementById('spectate-p2-history').innerHTML='';
     document.getElementById('spectate-waiting').style.display='block';
-    // Replay existing
     renderSpectateHistory(d);
     updateSpectateBanner(d);
     show('s-spectate-game');
-    if(d.status!=='won') startSpectatePoll();
-    else showSpectateWin(d);
+    if(d.status==='won') showSpectateWin(d);
+    else startSpectatePoll();
   } catch(e){
-    document.getElementById('spectate-err').textContent='// CONNECTION ERROR — TRY AGAIN';
+    document.getElementById('spectate-err').textContent='// CONNECTION ERROR: '+e.message;
   } finally{
     btn.disabled=false; btn.textContent='OBSERVE';
   }
