@@ -354,7 +354,7 @@ async function deleteRoom(code){
 function goSolo(){
   gameMode='solo'; isHost=false;
   secret=randSecret(); attempts=0;
-  console.log('Dev code:',secret.join(''));
+
   resetGameUI('SOLO'); show('s-game');
 }
 
