@@ -569,7 +569,8 @@ function startDuelHostPoll(){
     if(d.status==='active'&&d.p2_secret){
       stopPoll();
       duelPlayerNum=1;duelMyAttempts=0;
-      startDuelGame(d);
+      try{ await startDuelGame(d); }
+      catch(e){ document.getElementById('host-wait-txt').textContent='// ERROR STARTING DUEL: '+e.message; }
     }
   },2000);
 }
@@ -628,7 +629,7 @@ async function confirmDuelP2Pin(){
     await dbPatch(roomCode,{p2_secret:enc2,status:'active'});
     const d=await dbGet(roomCode);
     duelPlayerNum=2;duelMyAttempts=0;
-    startDuelGame(d);
+    await startDuelGame(d);
   } catch(e){
     document.getElementById('duel-p2-err').textContent='// ERROR — TRY AGAIN';
   } finally{
