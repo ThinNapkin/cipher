@@ -651,11 +651,10 @@ async function startDuelGame(d){
     :[d.p2_guesses||[],d.p2_results||[],d.p1_guesses||[],d.p1_results||[]];
   renderAlignedHistory(myG,myR,oppG,oppR,'duel-aligned-history');
 
-  // Code bar — show decrypted digits only in memory-backed DOM, never as data attributes
+  // Code bar — populate digits and reset listeners via on* (auto-overwrites, no cloning needed)
   const bar=document.getElementById('my-code-bar');
-  const newBar=bar.cloneNode(false);
-  bar.parentNode.replaceChild(newBar,bar);
   const digitsEl=document.getElementById('my-code-digits');
+  digitsEl.innerHTML='';
   digitsEl.innerHTML='';
   duelMySecret.forEach(n=>{
     const box=document.createElement('div');box.className='my-code-digit';
@@ -664,11 +663,11 @@ async function startDuelGame(d){
     box.append(m,r);digitsEl.appendChild(box);
   });
   const nb=document.getElementById('my-code-bar');
-  nb.addEventListener('mousedown',()=>nb.classList.add('showing'));
-  nb.addEventListener('touchstart',()=>nb.classList.add('showing'),{passive:true});
-  nb.addEventListener('mouseup',()=>nb.classList.remove('showing'));
-  nb.addEventListener('mouseleave',()=>nb.classList.remove('showing'));
-  nb.addEventListener('touchend',()=>nb.classList.remove('showing'));
+  nb.onmousedown  = ()=>nb.classList.add('showing');
+  nb.ontouchstart = ()=>nb.classList.add('showing');
+  nb.onmouseup    = ()=>nb.classList.remove('showing');
+  nb.onmouseleave = ()=>nb.classList.remove('showing');
+  nb.ontouchend   = ()=>nb.classList.remove('showing');
 
   gameMode='duel';
   show('s-duel-game');
